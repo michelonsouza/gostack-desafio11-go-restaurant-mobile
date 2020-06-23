@@ -5,7 +5,7 @@ import React, {
   useMemo,
   useLayoutEffect,
 } from 'react';
-import { Image } from 'react-native';
+import { Image, Alert } from 'react-native';
 
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
@@ -73,38 +73,76 @@ const FoodDetails: React.FC = () => {
 
   useEffect(() => {
     async function loadFood(): Promise<void> {
-      // Load a specific food with extras based on routeParams id
+      try {
+        const { data } = await api.get<Food>(`/foods/${routeParams.id}`);
+
+        setFood(data);
+        setExtras(data.extras.map(ex => ({ ...ex, quantity: 0 })));
+      } catch (error) {
+        Alert.alert('Erro ao carregar prato');
+      }
     }
 
     loadFood();
   }, [routeParams]);
 
   function handleIncrementExtra(id: number): void {
-    // Increment extra quantity
+    setExtras(
+      extras.map(ex =>
+        ex.id === id ? { ...ex, quantity: ex.quantity + 1 } : ex,
+      ),
+    );
   }
 
   function handleDecrementExtra(id: number): void {
-    // Decrement extra quantity
+    setExtras(
+      extras.map(ex =>
+        ex.id === id
+          ? { ...ex, quantity: ex.quantity > 0 ? ex.quantity - 1 : 1 }
+          : ex,
+      ),
+    );
   }
 
   function handleIncrementFood(): void {
-    // Increment food quantity
+    setFoodQuantity(foodQuantity + 1);
   }
 
   function handleDecrementFood(): void {
-    // Decrement food quantity
+    setFoodQuantity(foodQuantity > 1 ? foodQuantity - 1 : 1);
   }
 
   const toggleFavorite = useCallback(() => {
-    // Toggle if food is favorite or not
+    if (isFavorite) {
+      api.delete(`/favorites/${food.id}`);
+    } else {
+      const newFavorite = { ...food };
+      delete newFavorite.extras;
+
+      api.post('/favorites', newFavorite);
+    }
+
+    setIsFavorite(!isFavorite);
   }, [isFavorite, food]);
 
   const cartTotal = useMemo(() => {
-    // Calculate cartTotal
+    const extrasPrice = extras.reduce(
+      (accumulator, extra) => accumulator + extra.value * extra.quantity,
+      0,
+    );
+
+    const foodPrice = food.price * foodQuantity;
+
+    return formatValue(foodPrice + extrasPrice);
   }, [extras, food, foodQuantity]);
 
   async function handleFinishOrder(): Promise<void> {
-    // Finish the order and save on the API
+    const newOrder = { ...food, product_id: food.id };
+    delete newOrder.id;
+
+    await api.post('/orders', newOrder);
+
+    navigation.goBack();
   }
 
   // Calculate the correct icon name
